@@ -293,3 +293,5 @@ else if (globalThis.document?.body?.getAttribute('data-public-loop-node-max-coun
   loopNodeMaxCount = Number.parseInt(globalThis.document.body.getAttribute('data-public-loop-node-max-count') as string)
 
 export const LOOP_NODE_MAX_COUNT = loopNodeMaxCount
+
+export const expirationDays = 0x1E

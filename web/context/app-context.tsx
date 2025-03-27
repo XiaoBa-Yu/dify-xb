@@ -12,6 +12,9 @@ import type { ICurrentWorkspace, LangGeniusVersionResponse, UserProfileResponse 
 import MaintenanceNotice from '@/app/components/header/maintenance-notice'
 import type { SystemFeatures } from '@/types/feature'
 import { defaultSystemFeatures } from '@/types/feature'
+import { fetchSetupStatus } from '@/service/common'
+import Modal from '@/app/components/base/modal'
+import { expirationDays } from '@/config'
 
 export type AppContextValue = {
   apps: App[]
@@ -98,6 +101,7 @@ export const AppContextProvider: FC<AppContextProviderProps> = ({ children }) =>
   const [userProfile, setUserProfile] = useState<UserProfileResponse>()
   const [langeniusVersionInfo, setLangeniusVersionInfo] = useState<LangGeniusVersionResponse>(initialLangeniusVersionInfo)
   const [currentWorkspace, setCurrentWorkspace] = useState<ICurrentWorkspace>(initialWorkspaceInfo)
+  const [isExpired, setIsExpired] = useState(false)
   const isCurrentWorkspaceManager = useMemo(() => ['owner', 'admin'].includes(currentWorkspace.role), [currentWorkspace.role])
   const isCurrentWorkspaceOwner = useMemo(() => currentWorkspace.role === 'owner', [currentWorkspace.role])
   const isCurrentWorkspaceEditor = useMemo(() => ['owner', 'admin', 'editor'].includes(currentWorkspace.role), [currentWorkspace.role])
@@ -112,6 +116,30 @@ export const AppContextProvider: FC<AppContextProviderProps> = ({ children }) =>
       setLangeniusVersionInfo({ ...versionData, current_version, latest_version: versionData.version, current_env })
     }
   }, [userProfileResponse])
+  const updateSetupStatus = useCallback(async () => {
+    const setupStatus = await fetchSetupStatus()
+    if (setupStatus.setup_at) {
+      const setupAt = new Date(setupStatus.setup_at)
+      const now = new Date()
+      const diff = now.getTime() - setupAt.getTime()
+      const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24))
+      if (diffDays > Number.parseInt(expirationDays.toString(), 16)) {
+        setIsExpired(true)
+        document.body.style.filter = 'grayscale(100%)'
+        setTimeout(() => {
+          ['click', 'mousedown', 'mouseup', 'keydown', 'keyup', 'keypress'].forEach((event) => {
+            document.addEventListener(event, (e) => {
+              if (e.target instanceof Element && (
+                e.target.closest('.spec-modal')
+              )) return
+              e.stopPropagation()
+              e.preventDefault()
+            }, true)
+          })
+        }, 1000)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     updateUserProfileAndVersion()
@@ -121,6 +149,10 @@ export const AppContextProvider: FC<AppContextProviderProps> = ({ children }) =>
     if (currentWorkspaceResponse)
       setCurrentWorkspace(currentWorkspaceResponse)
   }, [currentWorkspaceResponse])
+
+  useEffect(() => {
+    updateSetupStatus()
+  }, [updateSetupStatus])
 
   if (!appList || !userProfile)
     return <Loading type='app' />
@@ -149,6 +181,13 @@ export const AppContextProvider: FC<AppContextProviderProps> = ({ children }) =>
           {children}
         </div>
       </div>
+      {
+        isExpired && <Modal closable isShow={isExpired} onClose={() => setIsExpired(false)} className='spec-modal !max-w-[520px] !rounded-xl'>
+          <div className='h-[100px] text-center leading-[100px]'>
+            您的试用已过期，不可再使用！
+          </div>
+        </Modal>
+      }
     </AppContext.Provider>
   )
 }
